@@ -1,9 +1,11 @@
 package alirezamontazer.createbest.productcatalog_v3;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.Bundle;
+import android.provider.ContactsContract;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -12,6 +14,12 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.Toast;
+
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,6 +31,7 @@ public class MainActivity extends AppCompatActivity {
     Button buttonAddProduct;
     ListView listViewProducts;
     List<Product> products;
+    DatabaseReference databaseProducts = FirebaseDatabase.getInstance().getReference("products");
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,6 +48,35 @@ public class MainActivity extends AppCompatActivity {
         clickOnAddProduct();
         onItemLongClick();
 
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        // attaching value event listener
+        databaseProducts.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+
+                // clearing the previous artist list
+                products.clear();
+
+                // iterating through all the nodes
+                for (DataSnapshot postSnapshot : snapshot.getChildren()) {
+                    // getting product
+                    Product product = postSnapshot.getValue(Product.class);
+                    // adding product to the list
+                    products.add(product);
+                }
+                // creating adapter
+                ProductList productsAdapter = new ProductList(MainActivity.this, products);
+                // attaching adapter to the listview
+                listViewProducts.setAdapter(productsAdapter);
+            }
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
     }
 
 
@@ -101,18 +139,52 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateProduct(String id, String name, double price) {
+        // getting the specified product reference
+        DatabaseReference dR =  FirebaseDatabase.getInstance().getReference("products").child(id);
 
-        Toast.makeText(getApplicationContext(), "NOT IMPLEMENTED YET", Toast.LENGTH_LONG).show();
+        // updating product
+        Product product = new Product(id, name, price);
+        dR.setValue(product);
+
+        Toast.makeText(getApplicationContext(), "Product Updated", Toast.LENGTH_LONG).show();
     }
 
-    private void deleteProduct(String id) {
+    private boolean deleteProduct(String id) {
+        // getting the specified product reference
+        DatabaseReference dR = FirebaseDatabase.getInstance().getReference("products").child(id);
+        dR.removeValue();
 
-        Toast.makeText(getApplicationContext(), "NOT IMPLEMENTED YET", Toast.LENGTH_LONG).show();
+        Toast.makeText(getApplicationContext(), "Product Deleted", Toast.LENGTH_LONG).show();
+        return true;
     }
 
     private void addProduct() {
+        // getting the values to save
+        String name = editTextName.getText().toString().trim();
+        double price = Double.parseDouble(String.valueOf(editTextPrice.getText().toString()));
 
-        Toast.makeText(this, "NOT IMPLEMENTED YET", Toast.LENGTH_LONG).show();
+        // checking if the value is provided
+        if (!TextUtils.isEmpty((name))) {
+            // getting a unique id using push().getKey() method
+            // it will create a unique id and we will use it as the Primary Key for our product
+            String id = databaseProducts.push().getKey();
+
+            // creating a Product Object
+            Product product = new Product(id, name, price);
+
+            // Saving the product
+            databaseProducts.child(id).setValue(product);
+
+            // setting edittext to blank again
+            editTextName.setText("");
+            editTextPrice.setText("");
+
+            // displaying a success toast
+            Toast.makeText(this, "Product Added", Toast.LENGTH_LONG).show();
+        } else {
+            // if the value is not given displaying a toast
+            Toast.makeText(this, "Please enter a name", Toast.LENGTH_LONG).show();
+        }
     }
 
 
